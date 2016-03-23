@@ -1,0 +1,31 @@
+{
+  "name": "mongodb.plugin",
+  "version": "1.0.0",
+  "description": "Freeboard plugin for MongoDB",
+  "main": "plugin.js",
+  "scripts": {
+      "build": "browserify plugin.js | uglifyjs --compress --output mongodb.plugin.js",
+      "postinstall": "browserify plugin.js | uglifyjs --compress --output mongodb.plugin.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Hitachi-Data-Systems/Freeboard-plugin-for-MongoDB.git"
+  },
+  "keywords": [
+    "freeboard",
+    "plugin",
+    "mongodb"
+  ],
+  "author": {
+    "name": "Reiji Nishiyama",
+    "email": "reiji.nishiyama@hds.com"
+  },
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/Hitachi-Data-Systems/Freeboard-plugin-for-MongoDB/issues"
+  },
+  "homepage": "https://github.com/Hitachi-Data-Systems/Freeboard-plugin-for-MongoDB#readme",
+  "dependencies": {
+    "rest": "^1.3.1"
+  }
+}
