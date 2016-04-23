@@ -18,14 +18,14 @@
 
 (function()
 {
-	freeboard.loadDatasourcePlugin({
-		"type_name"   : "mongodb_datasource_plugin",
-		"display_name": "MongoDB",
+    freeboard.loadDatasourcePlugin({
+        "type_name"   : "mongodb_datasource_plugin",
+        "display_name": "MongoDB",
         "description" : "Retrieve document from a mongo server with rest api.",
-		"external_scripts" : [
+        "external_scripts" : [
             ""
-		],
-		"settings"    : [
+        ],
+        "settings"    : [
             {
                 "name"          : "rest",
                 "display_name"  : "REST server",
@@ -40,109 +40,106 @@
                 "required"      : true,
                 "description"   : "/?filter='\{\"property\"\:\"value\"\}'"
             },
-			{
-				"name"         : "refresh_time",
-				"display_name" : "Refresh Time",
-				"type"         : "text",
-				"description"  : "In milliseconds",
-				"default_value": 1000
-			}
-		],
-		newInstance   : function(settings, newInstanceCallback, updateCallback)
-		{
-			newInstanceCallback(new MongodbDatasourcePlugin(settings, updateCallback));
-		}
-	});
+            {
+                "name"         : "refresh_time",
+                "display_name" : "Refresh Time",
+                "type"         : "text",
+                "description"  : "In milliseconds",
+                "default_value": 1000
+            }
+        ],
+        newInstance   : function(settings, newInstanceCallback, updateCallback)
+        {
+            newInstanceCallback(new MongodbDatasourcePlugin(settings, updateCallback));
+        }
+    });
 
 
-	var MongodbDatasourcePlugin = function(settings, updateCallback)
-	{
-		var self = this;
+    var MongodbDatasourcePlugin = function(settings, updateCallback)
+    {
+        var self = this;
 
-		var currentSettings = settings;
-        var previousTime;
+        var currentSettings = settings;
 
-		function getData()
-		{
+        // The getData() is to retrieve latest data within the specified time window as "Refresh Time" from MongoDB.
+        function getData()
+        {
             var currentTime = new Date().getTime();
             var refresh_time = currentSettings.refresh_time;
-            var delta = (currentTime - previousTime) > refresh_time ? currentTime - previousTime : refresh_time; 
-            
+
+            // The url has an url as a REST API of RESTHeart to retrieve data, which is a REST API server for MongoDB.
             var url = "http://";
             url += currentSettings.rest;
 
             //
+            // Support the following operators used for filtering data in a MongoDB collection.
             // {"$gt"|"$gte"|"$eq"|"$date":"$latest"}
-            // replace "$latest" with previous tick time
+            //
+            // The $gt, $gte, $eq and $date operators are from RESTHeart and handled by RESTHeart.
+            // The $latest operator is added and handled by this plugin. It is replaced with a time in interger value or ISO string format.
             // 
             var regexp = /\{\s*(['"])(\$gt|\$gte|\$eq|\$date)['"]\s*:\s*(['"]\$latest['"])\s*\}/g;
             var rest_api = currentSettings.rest_api;
             url += rest_api.replace(regexp, function(match, p1, p2, p3, offset, string) {
                 if (p2 == "$gt" || p2 == "$gte" || p2 == "$eq") {
-                    // var thresholdTime = currentTime - refresh_time;
-                    var thresholdTime = currentTime - delta;
+                    // If $latest is specified with $gt, $gte or $eq, then replace it with an interger value representing a previous expiration time.
+                    var thresholdTime = currentTime - refresh_time;
                     return "{" + p1 + p2 + p1 + ":" + thresholdTime + "}";
                 } else if (p2 == "$date") {
-                    // var thresholdTime = new Date(currentTime - refresh_time).toISOString();
-                    var thresholdTime = new Date(currentTime - delta).toISOString();
+                    // If $latest is specified with $date, then replace it with a string in ISO format representing a previous expiration time.
+                    var thresholdTime = new Date(currentTime - refresh_time).toISOString();
                     return "{" + p1 + p2 + p1 + ":" + p1 + thresholdTime +p1 + "}";
                 } else {
                     return match;
                 }
             });
-            console.log("url:" + url);
 
+            // Import rest api modules provided by the external package "rest".
             var rest = require('rest/client/xhr');
             var defaultRequest = require('rest/interceptor/defaultRequest');
             var client = rest.wrap(defaultRequest, {method: 'GET', headers:{'Content-Type':'application/json'}});
+
+            // Invoke a REST API of RESTHeart to retrieve data.
             client(url).then(function(response) {
-                console.log("update Freeboard");
-
                 var message = JSON.parse(response.entity);
-                updateCallback(message);
-                console.log("thresholdTime=" + new Date(currentTime - delta));
-                var diff = message["_embedded"]["rh:doc"][0]["header"]["timestamp"]["long"]-(currentTime - delta);
-                console.log("dTimestamp   =" + diff.toString());
+                if (message._returned > 0) {
+                    // Pass data to Freeboard.
+                    updateCallback(message);
+                }
             });
+        }
 
-            previousTime = currentTime;
-		}
+        // Create an interval timer to update Freeboard view with latest data every the interval specified by "Refresh Time".
+        var refreshTimer;
 
-		var refreshTimer;
+        function createRefreshTimer(interval)
+        {
+            if(refreshTimer)
+            {
+                clearInterval(refreshTimer);
+            }
 
-		function createRefreshTimer(interval)
-		{
-			if(refreshTimer)
-			{
-				clearInterval(refreshTimer);
-			}
+            refreshTimer = setInterval(function() {
+                getData();
+            }, interval);
+        }
 
-            previousTime = new Date().getTime();
-			refreshTimer = setInterval(function()
-			{
-				getData();
-			}, interval);
-		}
-
-		self.onSettingsChanged = function(newSettings)
-		{
-            console.log("onSettingsChanged");
-			currentSettings = newSettings;
+        self.onSettingsChanged = function(newSettings)
+        {
+            currentSettings = newSettings;
             createRefreshTimer(currentSettings.refresh_time);
-		}
+        }
 
-		self.updateNow = function()
-		{
-            console.log("updateNow");
-			getData();
-		}
+        self.updateNow = function()
+        {
+            getData();
+        }
 
-		self.onDispose = function()
-		{
-            console.log("onDispose");
-			clearInterval(refreshTimer);
-			refreshTimer = undefined;
-		}
-		createRefreshTimer(currentSettings.refresh_time);
-	}
+        self.onDispose = function()
+        {
+            clearInterval(refreshTimer);
+            refreshTimer = undefined;
+        }
+        createRefreshTimer(currentSettings.refresh_time);
+    }
 }());
