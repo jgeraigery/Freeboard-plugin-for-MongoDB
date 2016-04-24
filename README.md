@@ -4,6 +4,7 @@ A Freeboard plugin for MongoDB.
 This plugin enables Freeboard to retrieve latest data for every specified interval from MongoDB via the RESTHeart a REST API server for MongoDB.
 
 Refer to [Freeboard GitHub] (https://github.com/Freeboard/freeboard) for Freeboard specifics.
+
 Refer to [MongoDB GitHub] (https://github.com/mongodb/mongo) for MongoDB specifics.
 
 ##Prerequisites
